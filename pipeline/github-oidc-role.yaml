@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  IAM role that GitHub Actions assumes (via OIDC, no long-lived keys) to run
+  `sam deploy` for one environment. Deploy once per environment:
+    aws cloudformation deploy \
+      --template-file pipeline/github-oidc-role.yaml \
+      --stack-name orders-deploy-role-dev \
+      --parameter-overrides \
+          Environment=dev \
+          GitHubOrg=YOUR_GH_USER_OR_ORG \
+          GitHubRepo=YOUR_REPO_NAME \
+          BranchName=develop \
+          ArtifactBucketName=orders-sam-artifacts-dev-<ACCOUNT_ID> \
+      --capabilities CAPABILITY_NAMED_IAM
+
+  Repeat for prod with BranchName=main and Environment=prod.
+
+  If an OIDC provider for token.actions.githubusercontent.com already exists
+  in the account (only one is allowed per account), set
+  CreateOidcProvider=false before deploying the second environment.
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+  GitHubOrg:
+    Type: String
+    Description: GitHub username or organization that owns the repo.
+  GitHubRepo:
+    Type: String
+    Description: Repository name (without owner prefix).
+  BranchName:
+    Type: String
+    Description: Branch allowed to assume this role (e.g. develop or main).
+  ArtifactBucketName:
+    Type: String
+    Description: Name of the dedicated SAM artifact bucket for this environment.
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ['true', 'false']
+    Default: 'true'
+    Description: Set to false if the GitHub OIDC provider already exists in this account.
+
+Conditions:
+  ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, 'true']
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "github-actions-orders-deploy-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub "arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${BranchName}"
+      Policies:
+        - PolicyName: SamDeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: CloudFormationAccess
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ListStackResources
+                  - cloudformation:ValidateTemplate
+                Resource:
+                  - !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/orders-table-${Environment}/*"
+                  - !Sub "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31"
+              - Sid: ArtifactBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${ArtifactBucketName}"
+                  - !Sub "arn:aws:s3:::${ArtifactBucketName}/*"
+              - Sid: DynamoDbTableAccess
+                Effect: Allow
+                Action:
+                  - dynamodb:CreateTable
+                  - dynamodb:UpdateTable
+                  - dynamodb:DeleteTable
+                  - dynamodb:DescribeTable
+                  - dynamodb:TagResource
+                  - dynamodb:UntagResource
+                  - dynamodb:ListTagsOfResource
+                Resource:
+                  - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/orders-${Environment}"
+                  - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/orders-${Environment}/index/*"
+
+Outputs:
+  DeployRoleArn:
+    Value: !GetAtt DeployRole.Arn
+    Description: Add this as the AWS_ROLE_ARN secret/variable for this environment's GitHub Actions workflow.

@@ -1,0 +1,27 @@
+version = 0.1
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[dev.deploy.parameters]
+stack_name = "orders-table-dev"
+resolve_s3 = false
+s3_bucket = "orders-sam-artifacts-dev-447558491229"
+s3_prefix = "orders-table-dev"
+region = "eu-west-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "Environment=dev"
+confirm_changeset = false
+fail_on_empty_changeset = false
+
+[prod.deploy.parameters]
+stack_name = "orders-table-prod"
+resolve_s3 = false
+s3_bucket = "orders-sam-artifacts-prod-447558491229"
+s3_prefix = "orders-table-prod"
+region = "eu-west-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_AUTO_EXPAND"
+parameter_overrides = "Environment=prod"
+confirm_changeset = false
+fail_on_empty_changeset = false

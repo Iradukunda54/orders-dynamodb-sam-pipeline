@@ -1,0 +1,59 @@
+name: Deploy DynamoDB Table - Prod
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'template.yaml'
+      - 'samconfig.toml'
+      - '.github/workflows/deploy-prod.yml'
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-1
+
+jobs:
+  deploy-prod:
+    name: Build and deploy (prod)
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install AWS SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: SAM validate
+        run: sam validate --template template.yaml --lint
+
+      - name: SAM build
+        run: sam build --template template.yaml
+
+      - name: SAM deploy (prod)
+        run: |
+          sam deploy \
+            --config-env prod \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --s3-bucket "${{ secrets.ARTIFACT_BUCKET }}" \
+            --stack-name orders-table-prod \
+            --region "${{ env.AWS_REGION }}" \
+            --parameter-overrides Environment=prod

@@ -1,0 +1,5 @@
+.aws-sam/
+*.log
+.vscode/
+.idea/
+.qodo/

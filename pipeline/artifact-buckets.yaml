@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Dedicated, environment-scoped S3 bucket for SAM deployment artifacts.
+  Deploy this stack once per environment (dev and prod) before running the
+  GitHub Actions pipelines, e.g.:
+    aws cloudformation deploy \
+      --template-file pipeline/artifact-buckets.yaml \
+      --stack-name orders-artifacts-dev \
+      --parameter-overrides Environment=dev \
+      --capabilities CAPABILITY_IAM
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "orders-sam-artifacts-${Environment}-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldArtifactVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+Outputs:
+  BucketName:
+    Value: !Ref ArtifactBucket
