@@ -24,6 +24,18 @@ Defined in [template.yaml](template.yaml) as a plain `AWS::DynamoDB::Table`
 resource rather than `AWS::Serverless::SimpleTable`, since `SimpleTable`
 cannot express GSIs or a non-default `TableClass`.
 
+## Why two hand-written workflows instead of `sam pipeline init`
+
+The lab's challenge explicitly calls for environment-specific pipelines
+*instead of* SAM's auto-generated multi-stage workflow, so
+`deploy-dev.yml`/`deploy-prod.yml` are hand-authored rather than produced by
+`sam pipeline init` — each triggers only on its own branch, deploys only its
+own stack, and reads only its own environment's config out of
+`samconfig.toml`. Deployment parameters (stack name, per-env S3 bucket,
+region, `Environment` parameter override) are likewise split into dedicated
+`[dev.deploy.parameters]` / `[prod.deploy.parameters]` stanzas rather than
+one shared config block.
+
 ## Repo layout
 
 ```

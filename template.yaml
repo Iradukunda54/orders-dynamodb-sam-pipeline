@@ -56,6 +56,8 @@ Resources:
       Tags:
         - Key: Environment
           Value: !Ref Environment
+        - Key: Project
+          Value: orders-dynamodb-sam-pipeline
 
 Outputs:
   TableName:
