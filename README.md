@@ -1,5 +1,9 @@
 # Orders DynamoDB Table — AWS SAM
 
+**Live deployment:** `orders-dev` and `orders-prod` tables in `eu-west-1`,
+deployed via the [dev](../../actions/workflows/deploy-dev.yml) and
+[prod](../../actions/workflows/deploy-prod.yml) GitHub Actions pipelines.
+
 A DynamoDB table (`orders-<env>`) deployed with AWS SAM, with fully separate
 dev/prod GitHub Actions pipelines and dedicated per-environment S3 artifact
 buckets.
@@ -30,6 +34,13 @@ pipeline/github-oidc-role.yaml      IaC: per-env IAM role GitHub Actions assumes
 .github/workflows/deploy-dev.yml    Pipeline for the dev environment (branch: develop)
 .github/workflows/deploy-prod.yml   Pipeline for the prod environment (branch: main)
 ```
+
+## Status
+
+Both environments are bootstrapped and deployed already: artifact buckets,
+OIDC deploy roles, GitHub environment secrets, and the `orders-dev` /
+`orders-prod` tables all exist. The steps below are what was run, kept here
+so the setup is reproducible (e.g. in a fresh AWS account).
 
 ## One-time setup (per environment)
 
