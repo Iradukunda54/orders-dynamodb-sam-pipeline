@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   IAM role that GitHub Actions assumes (via OIDC, no long-lived keys) to run
-  `sam deploy` for one environment. The trust condition matches the `sub`
-  claim GitHub issues when a workflow job sets `environment: <name>` (i.e.
-  `repo:<org>/<repo>:environment:<name>`), not a branch ref. Deploy once per
-  environment:
+  `sam deploy` for one environment. The trust condition matches on the
+  dedicated `repository` and `environment` OIDC claims GitHub issues (rather
+  than parsing the `sub` claim, which also embeds numeric owner/repo IDs).
+  Deploy once per environment:
     aws cloudformation deploy \
       --template-file pipeline/github-oidc-role.yaml \
       --stack-name orders-deploy-role-dev \
@@ -68,8 +68,10 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:repository: !Sub "${GitHubOrg}/${GitHubRepo}"
+                token.actions.githubusercontent.com:environment: !Ref Environment
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${Environment}"
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}*/${GitHubRepo}*:environment:${Environment}"
       Policies:
         - PolicyName: SamDeployPolicy
           PolicyDocument:
