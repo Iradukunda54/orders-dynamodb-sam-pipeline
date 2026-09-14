@@ -1,7 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   IAM role that GitHub Actions assumes (via OIDC, no long-lived keys) to run
-  `sam deploy` for one environment. Deploy once per environment:
+  `sam deploy` for one environment. The trust condition matches the `sub`
+  claim GitHub issues when a workflow job sets `environment: <name>` (i.e.
+  `repo:<org>/<repo>:environment:<name>`), not a branch ref. Deploy once per
+  environment:
     aws cloudformation deploy \
       --template-file pipeline/github-oidc-role.yaml \
       --stack-name orders-deploy-role-dev \
@@ -9,11 +12,10 @@ Description: >
           Environment=dev \
           GitHubOrg=YOUR_GH_USER_OR_ORG \
           GitHubRepo=YOUR_REPO_NAME \
-          BranchName=develop \
           ArtifactBucketName=orders-sam-artifacts-dev-<ACCOUNT_ID> \
       --capabilities CAPABILITY_NAMED_IAM
 
-  Repeat for prod with BranchName=main and Environment=prod.
+  Repeat for prod with Environment=prod.
 
   If an OIDC provider for token.actions.githubusercontent.com already exists
   in the account (only one is allowed per account), set
@@ -29,9 +31,6 @@ Parameters:
   GitHubRepo:
     Type: String
     Description: Repository name (without owner prefix).
-  BranchName:
-    Type: String
-    Description: Branch allowed to assume this role (e.g. develop or main).
   ArtifactBucketName:
     Type: String
     Description: Name of the dedicated SAM artifact bucket for this environment.
@@ -70,7 +69,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${BranchName}"
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${Environment}"
       Policies:
         - PolicyName: SamDeployPolicy
           PolicyDocument:
